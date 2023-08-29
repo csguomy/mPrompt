@@ -1,0 +1,62 @@
+----------------- Options ---------------
+                  amsgrad: 0                             
+                 base_mae: 60,10,100                     
+               batch_size: 5                             
+          checkpoints_dir: ./output                      
+                  cls_num: 1                             
+                    cls_w: 1.0                           
+             dataset_name: SHA                           	[default: JSTL_large]
+                   device: cuda                          
+                dist_eval: 0                             
+              dist_on_itp: False                         
+                 dist_url: env://                        
+         downsample_ratio: 8                             
+                drop_rate: 0.3                           
+           eval_per_epoch: 1                             
+            eval_per_step: inf                           
+        eval_size_per_GPU: 1                             
+                fine_size: 400                           
+                  gpu_ids: 0,1                           
+                init_gain: 0.01                          
+                init_type: normal                        
+                  isTrain: False                         	[default: None]
+             is_color_aug: 1                             
+                  is_flip: 1                             
+            is_random_hsi: 1                             
+               local_rank: -1                            
+                       lr: 0.0001                        
+           lr_decay_iters: 300                           
+                lr_policy: step                          
+               max_epochs: 500                           
+                   min_lr: 1e-07                         
+                     mode: crop                          
+                model_ema: 0                             
+          model_ema_decay: 0.996                         
+      model_ema_force_cpu: 0                             
+               multi_head: 2                             
+                 nThreads: 2                             
+                     name: test                          	[default: hrnet_aspp_relu]
+                 net_name: hrnet_aspp_relu_gbn_seg_stage4	[default: hrnet_aspp_relu_s6]
+                    niter: 1                             
+                norm_cood: 0                             
+        num_of_iter_in_ot: 100                           
+                optimizer: adam                          
+                  pin_mem: 1                             
+                 pretrain: 0                             
+           pretrain_model: ./models/MAE_5.83_MSE_9.63_mae_5.83_mse_9.63_Ep_451.pth	[default: ]
+               print_step: 10                            
+          rand_scale_rate: 0.0                           
+                      reg: 10.0                          
+              results_dir: ./results/                    
+                     seed: 0                             
+         start_eval_epoch: 100                           
+                test_eval: 0                             
+           unknown_folder: unknown_video/frames2_full_img
+           use_background: True                          
+            warmup_epochs: 10                            
+             warmup_steps: 0                             
+             weight_decay: 0                             
+               world_size: 1                             
+                      wot: 0.1                           
+                      wtv: 0.01                          
+----------------- End -------------------
