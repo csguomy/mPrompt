@@ -8,7 +8,7 @@ from config import config
 import net.networks as networks
 from eval.Estimator_single import Estimator
 from options.train_options import TrainOptions
-from Dataset.DatasetConstructor_seg import TrainDatasetConstructor,EvalDatasetConstructor
+from Dataset.DatasetConstructor_seg import TrainDatasetConstructor
 from ipdb import launch_ipdb_on_exception
 import copy
 
@@ -36,51 +36,7 @@ train_dataset = TrainDatasetConstructor(
     fine_size=opt.fine_size,
     opt=opt
     )
-eval_dataset = EvalDatasetConstructor(
-    setting.eval_num,
-    setting.eval_img_path,
-    setting.eval_gt_map_path,
-    setting.box_path,
-    mode=setting.mode,
-    dataset_name=setting.dataset_name,
-    device=setting.device)
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=setting.batch_size, shuffle=True, num_workers=opt.nThreads, drop_last=True)
-
-def my_collfn(batch):
-    img_path = [item[0] for item in batch]
-    imgs = [item[1] for item in batch]
-    gt_map = [item[2] for item in batch]
-    gt_H = [item[3] for item in batch]
-    gt_W = [item[4] for item in batch]
-    pH = [item[5] for item in batch]
-    pW = [item[6] for item in batch]
-
-    bz = len(batch)
-
-    gt_H = torch.stack(gt_H, 0)
-    gt_W = torch.stack(gt_W, 0)
-    pH = torch.stack(pH, 0)
-    pW = torch.stack(pW, 0)
-    gt_h_max = torch.max(gt_H)
-    gt_w_max = torch.max(gt_W)
-
-    ph_max = torch.max(pH)
-    pw_max = torch.max(pW)
-
-    imgs_new = torch.zeros(bz, 9, 3, ph_max, pw_max) # bz * 9 * c * gth_max * gtw_max
-    gt_map_new = torch.zeros(bz, 1, 1, gt_h_max, gt_w_max)
-
-    # put map
-    for i in range(bz):
-        imgs_new[i, :, :, :pH[i], :pW[i]] = imgs[i]
-        # h, w
-        gt_map_new[i, :, :, :gt_H[i], :gt_W[i]] = gt_map[i]
-
-    return img_path, imgs_new, gt_map_new, pH, pW, gt_H, gt_W
-
-assert opt.eval_size_per_GPU == 1, "Using this is fast enough and for large size evaluation"
-batch_eval_size = opt.eval_size_per_GPU * len(opt.gpu_ids)
-eval_loader = torch.utils.data.DataLoader(dataset=eval_dataset, batch_size=batch_eval_size, collate_fn=my_collfn)
 
 # model construct
 net = networks.define_net(opt)
@@ -121,40 +77,6 @@ with launch_ipdb_on_exception():
     for epoch_index in range(setting.epoch):
         
         loss_all = 0
-        print('alpha={:03f}  scale={:03f}'.format(adaptive.alpha()[0,0].data, adaptive.scale()[0,0].data)) 
-        
-        # eval
-        if epoch_index % opt.eval_per_epoch == 0 and epoch_index > opt.start_eval_epoch:
-            
-            print('Evaluating epoch:', str(epoch_index))
-            torch.cuda.empty_cache()
-           
-            validate_MAE, validate_RMSE, validate_loss, time_cost, pred_mae, pred_mse = estimator.evaluate(net,  epoch_index, eval_loader.__len__() * batch_eval_size) 
-            # validate the code of eval
-            if opt.test_eval==1 and opt.start_eval_epoch==-1:
-                assert 1==2, print('Test over~')
-            
-            log_f.write(
-                'In step {}, epoch {}, loss = {}, eval_mae = {}, eval_rmse = {}, mae = {}, mse = {}, time cost eval = {}s\n'.format(step, epoch_index, validate_loss, validate_MAE, validate_RMSE, pred_mae,
-                        pred_mse, time_cost))
-            log_f.flush()
-
-            # save model with epoch and MAE
-            save_now = False
-            if pred_mae < base_mae:
-                save_now = True
-            if save_now:
-                best_model_name = setting.model_save_path + "/MAE_" + str(round(validate_MAE, 2)) + \
-                    "_MSE_" + str(round(validate_RMSE, 2)) + '_mae_' + str(round(pred_mae, 2)) + \
-                    '_mse_' + str(round(pred_mse, 2)) + \
-                    '_Ep_' + str(epoch_index) + '.pth'
-                if len(opt.gpu_ids) > 0 and torch.cuda.is_available():
-                    torch.save(net.module.cpu().state_dict(), best_model_name)
-                    net.cuda(opt.gpu_ids[0])
-                else:
-                    torch.save(net.cpu().state_dict(), best_model_name)
-
-
         time_per_epoch = 0
         
         for train_img, train_gt, fbs, img_path in train_loader:
