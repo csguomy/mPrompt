@@ -75,6 +75,7 @@ best_model_name = setting.model_save_path + '/Seg_best_loss_' + str(round(best_l
 with launch_ipdb_on_exception():
 
     for epoch_index in range(setting.epoch):
+        print('alpha={:03f}  scale={:03f}'.format(adaptive.alpha()[0,0].data, adaptive.scale()[0,0].data)) 
         
         loss_all = 0
         time_per_epoch = 0
