@@ -6,7 +6,7 @@ from torch.nn import init
 from torch.optim import lr_scheduler
 import functools
 
-from net.HRNet.hrnet_aspp_relu_gbn_seg_stage4 import HighResolutionNet as HRNet_aspp_relu_gbn_seg_stage4
+from net.HRNet.reg_seg import HighResolutionNet as reg_seg
 
 ###############################################################################
 # Helper Functions
@@ -94,8 +94,8 @@ def define_net(opt):
     net_name = opt.net_name
     print('net_name: ', net_name)
 
-    if net_name == 'hrnet_aspp_relu_gbn_seg_stage4':
-        net = HRNet_aspp_relu_gbn_seg_stage4()
+    if net_name == 'reg_seg':
+        net = reg_seg()
         #net.init_weights(pretrained = opt.pretrain_model)
     else:
         raise NotImplementedError('Unrecognized model: '+ net_name)
