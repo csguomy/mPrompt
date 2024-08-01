@@ -90,12 +90,189 @@ class DatasetConstructor(data.Dataset):
             return img, resize_height, resize_width, ratio_H, ratio_W
         else:
             return resize_height, resize_width
+         
+class TrainDatasetConstructor(DatasetConstructor):
+    def __init__(self,
+                 train_num,
+                 data_dir_path,
+                 gt_dir_path,
+                 box_dir_path,
+                 mode='crop',
+                 dataset_name="JSTL",
+                 device=None,
+                 is_random_hsi=False,
+                 is_flip=False,
+                 fine_size = 400,
+                 opt=None,
+                 ):
 
-#
+        super(TrainDatasetConstructor, self).__init__()
+        self.train_num = train_num
+        self.opt = opt
+        self.imgs = []
+        self.fine_size = fine_size
+        self.permulation = np.random.permutation(self.train_num)
+        self.data_root, self.gt_root = data_dir_path, gt_dir_path
+        self.mode = mode
+        self.device = device
+        self.is_random_hsi = is_random_hsi
+        self.is_flip = is_flip
+        self.dataset_name = dataset_name
+        self.kernel = torch.FloatTensor(torch.ones(1, 1, 2, 2))
+        self.online_map = True if self.opt.rand_scale_rate > 0.0 else False
+        # they are mapped as pairs
+        imgs = sorted(glob.glob(self.data_root+'/*'))
+        dens = sorted(glob.glob(self.gt_root+'/*'))
+        self.train_num = len(imgs)
+        print('Constructing training dataset...')
+        for i in range(self.train_num):
+            img_tmp = imgs[i]
+
+            den = os.path.join(self.gt_root, os.path.basename(img_tmp)[:-4] + ".npy")
+            assert den in dens, "Automatically generating density map paths corrputed!"
+            self.imgs.append([imgs[i], den])
+
+        self.train_num = len(self.imgs)
+        print(self.train_num)
+        
+
+    def __getitem__(self, index):
+        if self.mode == 'crop':
+      
+            img_path, gt_map_path = self.imgs[index]
+            
+            #print(img_path)
+            img = cv2.imread(img_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(img)
+            cur_dataset = super(TrainDatasetConstructor, self).get_cur_dataset(img_path)
+
+            img, resize_height, resize_width, ratio_h, ratio_w = super(TrainDatasetConstructor, self).resize(img, cur_dataset, self.opt.rand_scale_rate)
+            width, height = img.size
+            
+            # The ground-truth of density map
+            gt_map = np.squeeze(np.load(gt_map_path).astype(np.float32))
+            gt_map_sum = math.ceil(np.sum(gt_map))
+            mask_den = (gt_map > 0)
+            
+            ## get mask from pretrained segmentation task
+            mask_seg_path = gt_map_path.replace('den', 'mask')
+            mask = np.squeeze(np.load(mask_seg_path).astype(np.float32))
+            mask = (mask > 0.055)
+            mask_seg = mask
+
+            mat_name = img_path.replace('images', 'ground_truth')[:-4] + ".mat"
+            points = scio.loadmat(mat_name)['annPoints']
+            points_sum = len(points)
+            
+            # generate bigger kernal gaussian mask than density map as segmentation mask
+            if points_sum > 0:
+                h = resize_height
+                w = resize_width
+                for idx, p in enumerate(points):
+                    p = np.round(p).astype(int)
+                    p[1], p[0] = min(h-1, math.floor(p[1] * ratio_h)), min(w-1, math.floor(p[0] * ratio_w))
+                    points[idx] = (p[0], p[1])
+                
+                mask_gaussian = generate_density_map(shape=(height, width),points=points,boxes=[],f_sz=35,sigma=4)
+                mask_gaussian = np.reshape(mask_gaussian, [height, width])  # transpose into w, h
+                mask_gaussian = np.int32(mask_gaussian > 0)  
+                
+                # Add mask_gaussian blob to pesudo seg mask
+                #mask = np.bitwise_or(mask_gaussian, mask)
+                
+                # baseline of dot-segmentation 
+                #mask = mask_gaussian
+                
+            else:
+                print('points_sum==0 ', img_path)
+                          
+            # Resize: annotation label vision
+            mask_annotation = np.zeros((img_vision.size[1], img_vision.size[0]), np.uint8)
+            for i in range(0, points_sum):
+                mask_annotation = cv2.circle(mask_annotation, (math.ceil(points[i][0]), math.ceil(points[i][1])), 1, 1, -1) 
+            
+
+            # KNN mask
+            k_n = 3
+            points_sum = len(points)
+            mask_knn = np.zeros((img.size[1], img.size[0]), np.uint8)
+            if points_sum >= k_n+1:
+                points_knn = KNN(points, k_n)            
+                points_knn_sum = len(points_knn)
+        
+                for i in range(0, points_knn_sum):
+                    k = k_n
+                    r = points_knn[i][k-1]
+                    r_c = np.mean(points_knn[i][0:k-1])
+                    while r > r_c * 2:
+                        k = k-1
+                        r = points_knn[i][k-1]
+                        if points_knn[i][0:k-1]:
+                            r_c = np.mean(points_knn[i][0:k-1])
+                        else:
+                            r_c = r
+                    mask_knn = cv2.circle(mask_knn, (math.ceil(points[i][0]), math.ceil(points[i][1])), math.floor(r), 1, -1) 
+                 
+                # operation: and 
+                mask = np.bitwise_and(mask_knn, mask) 
+            
+            else:
+                mask_knn = np.ones((img.size[1], img.size[0]), np.uint8)
+                print('points_sum < k+1 ', points_sum, img_path)            
+                      
+         
+            # or
+            mask = np.bitwise_or(mask_den, mask)
+
+            # DataAugmentation
+            # form numpy to PIL
+            mask = Image.fromarray(mask)
+            gt_map = Image.fromarray(gt_map)
+            mask_knn = Image.fromarray(mask_knn)
+            if self.is_random_hsi:
+                #img = img
+                img = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2)(img)
+            if self.is_flip:
+                flip_random = random.random()
+                if flip_random > 0.5:
+                    img = F.hflip(img)
+                    gt_map = F.hflip(gt_map)
+                    mask = F.hflip(mask)
+                    mask_knn = F.hflip(mask_knn)
+                                    
+            # PIL crop
+            # from PIL to tensor
+            img, gt_map, mask, mask_knn = transforms.ToTensor()(np.array(img)), torch.from_numpy(np.array(gt_map)).view(1, height, width), torch.from_numpy(np.array(mask)).view(1, height, width), torch.from_numpy(np.array(mask_knn)).view(1, height, width)
+            
+            img_shape = img.shape  # C, H, W
+            gt_map_shape = gt_map.shape
+            gt_seg_shape = mask.shape
+       
+            # also scale gt_map
+            if img_shape[1] != gt_map_shape[1] or img_shape[2] != gt_map_shape[2] or img_shape[1] != gt_seg_shape[1] or img_shape[2] != gt_seg_shape[2]:
+                print(img.shape, gt_map.shape, mask.shape)
+                assert 1==2
+                gt_map = functional.interpolate(gt_map.unsqueeze(0), (img_shape[1], img_shape[2]), mode='bilinear').squeeze(0)
+            
+            # crop
+            rh, rw = random.randint(0, img_shape[1] - self.fine_size), random.randint(0, img_shape[2] - self.fine_size)
+            p_h, p_w = self.fine_size, self.fine_size
+
+            img = img[:, rh:rh + p_h, rw:rw + p_w]
+            gt_map = gt_map[:, rh:rh + p_h, rw:rw + p_w]
+            mask = mask[:, rh:rh + p_h, rw:rw + p_w]
+            mask_knn = mask_knn[:, rh:rh + p_h, rw:rw + p_w]
+
+            img = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))(img)
+            mask = (mask > 0).float()
+            return img.view(3, self.fine_size, self.fine_size), gt_map.view(1, self.fine_size, self.fine_size), mask.view(1, self.fine_size, self.fine_size), mask_knn.view(1, self.fine_size, self.fine_size), os.path.basename(img_path)
+
+    def __len__(self):
+        return self.train_num
+
 # For evalation, we also return img_path.
 # This help get the paths of '.mat' recording the real num(not from density map).
-#
-#
 class EvalDatasetConstructor(DatasetConstructor):
     def __init__(self,
                  validate_num,
