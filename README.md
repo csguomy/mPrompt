@@ -4,7 +4,7 @@ Crowd Counting via Segmenter-Regressor Mutual Prompt Learning
 
 **Training / Testing code of mPrompt is available.**
 
-# Datasets Preparation
+### Datasets Preparation
 Download the datasets `ShanghaiTech A`, `ShanghaiTech B`, `UCF-QNRF` and `NWPU`. 
 Then generate the density maps via `gen_den_map.py`.
 
