@@ -334,7 +334,7 @@ class HighResolutionNet(nn.Module):
 
 
         # addHead 
-        self.last_layer_seg_new = nn.Sequential(
+        self.last_layer_seg = nn.Sequential(
             nn.Conv2d(
                 in_channels=last_inp_channels,
                 out_channels=128,
@@ -359,12 +359,6 @@ class HighResolutionNet(nn.Module):
                 padding=1),
             nn.BatchNorm2d(32, momentum=BN_MOMENTUM),
             nn.ReLU(inplace=True),
-            #nn.Conv2d(
-            #    in_channels=32,
-            #    out_channels=1,
-            #    kernel_size=1,
-            #    stride=1,
-            #    padding=0)
         )
         self.segHead = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=1, stride=1, padding=0)
         
@@ -397,12 +391,6 @@ class HighResolutionNet(nn.Module):
                 padding=1),
             nn.BatchNorm2d(32, momentum=BN_MOMENTUM),
             nn.ReLU(True),
-            #nn.Conv2d(
-            #    in_channels=32,
-            #    out_channels=1,
-            #    kernel_size=1,
-            #    stride=1,
-            #    padding=0)
         )
         
         # addHead
@@ -517,7 +505,6 @@ class HighResolutionNet(nn.Module):
             else:
                 x_list.append(y_list[i])
         y_list = self.stage3(x_list)
-      #  x = self.stage3(x_list)
 
         x_list = []
         for i in range(self.stage4_cfg['NUM_BRANCHES']):
@@ -527,18 +514,16 @@ class HighResolutionNet(nn.Module):
                 x_list.append(y_list[i])
         x = self.stage4(x_list)
 
-        # Replace the classification heaeder with custom setting
-        # Upsampling
         x0_h, x0_w = x[0].size(2), x[0].size(3)
         x1 = F.interpolate(x[1], size=(x0_h, x0_w), mode='bilinear', align_corners=False)
         x2 = F.interpolate(x[2], size=(x0_h, x0_w), mode='bilinear', align_corners=False)
         x3 = F.interpolate(x[3], size=(x0_h, x0_w), mode='bilinear', align_corners=False)
 
-        #x = torch.cat([x[0], x1, x2, x_head_1], 1)
         x = torch.cat([x[0], x1, x2, x3, x_head_1], 1)
         # above is backbone
 
-        seg_map = self.last_layer_seg_new(x)
+        ######### segmenting branch #########
+        seg_map = self.last_layer_seg(x)
         # Attention
         attention_map = (torch.tanh(seg_map) + 1)/2
     
@@ -563,38 +548,18 @@ class HighResolutionNet(nn.Module):
         # attention
         x = x * attention_map
 
-        # up size
-        #x = F.interpolate(x, size=(x0_h*2, x0_w*2), mode='bilinear', align_corners=False)
-        # add head
+        # for counting
         x= self.countHead(x)
         x = F.interpolate(x, size=(x0_h*2, x0_w*2), mode='bilinear', align_corners=False)
         x = F.relu_(x)
-        
+
+        # for segmenting
         attention_map = F.interpolate(attention_map, size=(x0_h*2, x0_w*2), mode='bilinear', align_corners=False)
         seg_map = self.segHead(attention_map)
         seg_map = (torch.tanh(seg_map) + 1)/2        
           
-
         return x, seg_map
       
-    def get_params(self):
-        self.ada_sig_params = []
-        self.oth_params = []
-        for name, param in self.named_parameters():
-            #print('get_params: ', name)
-            #if hasattr(name, 'sigm'):
-            if name.startswith("sigm."):
-                print('get_params: ', name)
-                #self.ada_sig_params.append(param)
-                self.ada_sig_params += [param]
-            else:
-                #self.other_params.append(param)
-                self.oth_params += [param]
-
-        return [{'params': self.ada_sig_params, 'lr': 0.005},
-                {'params': self.oth_params}] 
-
-
     def init_weights(net, init_type='normal', gain=0.02, pretrained='', ):
         def init_func(m):
             classname = m.__class__.__name__
@@ -618,31 +583,27 @@ class HighResolutionNet(nn.Module):
         print('=> initialize network with %s' % init_type)
         net.apply(init_func)
         
-        # load HRNet
+        # load weights
         if os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)
             print('=> loading pretrained model {}'.format(pretrained))
             model_dict = net.state_dict()
             
+#             # load backbone 
+#             pretrained_dict = {k: v for k, v in pretrained_dict.items()
+#                                if k in model_dict.keys()}
+
             
             # load pretrained segmentation model (backbone + segHead)
             #for k, v in pretrained_dict.items():
             #    print(k)
             #print('-------------------------------------------------------------------------')
             #for k in model_dict.keys():
-            #    print(k)
-            
-            
-            # load pretrained segmentation model (backbone + segHead)        
+            #    print(k)       
             pretrained_dict = {k.replace('module.', ''): v for k, v in pretrained_dict.items()
                                if k.replace('module.', '') in model_dict.keys()}
             
-            '''
-            # load backbone 
-            pretrained_dict = {k: v for k, v in pretrained_dict.items()
-                               if k in model_dict.keys()}
-            '''
-
+            
             for k, _ in pretrained_dict.items():
                 print(
                     '=> loading {} pretrained model {}'.format(k, pretrained))
