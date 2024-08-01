@@ -2,7 +2,7 @@
 
 Crowd Counting via Segmenter-Regressor Mutual Prompt Learning
 
-**Testing code of mPrompt is available.**
+**Training / Testing code of mPrompt is available.**
 
 # Datasets Preparation
 Download the datasets `ShanghaiTech A`, `ShanghaiTech B`, `UCF-QNRF` and `NWPU`. 
