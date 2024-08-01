@@ -20,5 +20,5 @@ bash download_models.sh
 And put the model into folder `./models/`
 
 ```bash
-bash run.sh
+bash run_test.sh
 ```
