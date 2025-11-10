@@ -4,7 +4,7 @@ DATASET_NAME='SHA'
 SAVE_NAME=${DATASET_NAME}'_train'
 
 python train.py --dataset_name=${DATASET_NAME} \
-                 --gpu_ids='0,1,2,3' \
+                 --gpu_ids='0' \
                  --optimizer='adam' \
                  --test_eval=0 \
                  --start_eval_epoch=400 \
