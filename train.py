@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from config import config
-from net.RES_FPN.FPN import FPN
 import net.networks as networks
 from eval.Estimator import Estimator
 from options.train_options import TrainOptions
