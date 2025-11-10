@@ -187,6 +187,8 @@ with launch_ipdb_on_exception():
             prediction, mask_out = net(x)
                           
             loss = criterion1(prediction, y)
+
+            count_loss = criterion3(prediction.sum((1,2,3)), train_gt.sum((1,2,3)))
             
             # den_mask
             prediction_mask = (prediction > 0.0).float()
