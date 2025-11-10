@@ -9,6 +9,7 @@ import random
 import math
 import glob
 import os
+import cv2
 from util import utils
 
 class DatasetConstructor(data.Dataset):
