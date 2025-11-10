@@ -157,10 +157,10 @@ class TrainDatasetConstructor(DatasetConstructor):
             mask_den = (gt_map > 0)
             
             ## get mask from pretrained segmentation task
-            mask_seg_path = gt_map_path.replace('den', 'mask')
-            mask = np.squeeze(np.load(mask_seg_path).astype(np.float32))
-            mask = (mask > 0.055)
-            mask_seg = mask
+            # mask_seg_path = gt_map_path.replace('den', 'mask')
+            # mask = np.squeeze(np.load(mask_seg_path).astype(np.float32))
+            # mask = (mask > 0.055)
+            # mask_seg = mask
 
             mat_name = img_path.replace('images', 'ground_truth')[:-4] + ".mat"
             points = scio.loadmat(mat_name)['annPoints']
