@@ -14,6 +14,34 @@ import scipy.io as scio
 from util import utils
 from gen_den_map import generate_density_map
 
+def KNN(train_data, k):
+    train_data_knn = {}
+
+    train_data_size = train_data.shape[0]
+    if train_data_size >= k+1:
+        for i in range(0, train_data_size):
+            distance = (np.tile(train_data[i], (train_data_size, 1)) - train_data) ** 2 
+
+            add_distance = distance.sum(axis=1)
+            sq_distance = add_distance ** 0.5
+            index = sq_distance.argsort()
+            knn_index = []
+            knn_distance = []
+            for j in range(0, train_data_size):
+                if sq_distance[index[j]] == 0:
+                    #print(i, train_data[i], index[j], train_data[index[j]])
+                    continue
+                knn_index.append(index[j]) 
+                '''
+                if sq_distance[index[j]] == 0:
+                    print(j, sq_distance[index[j]]) 
+                '''
+                knn_distance.append(sq_distance[index[j]])
+                if len(knn_distance) >= k:
+                    break 
+            train_data_knn[i] = knn_distance
+    return train_data_knn
+
 class DatasetConstructor(data.Dataset):
     def __init__(self):
         self.datasets_com = ['SHA', 'SHB', 'QNRF', 'NWPU']
@@ -141,7 +169,6 @@ class TrainDatasetConstructor(DatasetConstructor):
 
     def __getitem__(self, index):
         if self.mode == 'crop':
-      
             img_path, gt_map_path = self.imgs[index]
             
             #print(img_path)
@@ -153,6 +180,8 @@ class TrainDatasetConstructor(DatasetConstructor):
             img, resize_height, resize_width, ratio_h, ratio_w = super(TrainDatasetConstructor, self).resize(img, cur_dataset, self.opt.rand_scale_rate)
             width, height = img.size
             
+            mask = np.zeros((img.size[1], img.size[0]), np.uint8)
+            
             # The ground-truth of density map
             gt_map = np.squeeze(np.load(gt_map_path).astype(np.float32))
             gt_map_sum = math.ceil(np.sum(gt_map))
@@ -163,7 +192,8 @@ class TrainDatasetConstructor(DatasetConstructor):
             # mask = np.squeeze(np.load(mask_seg_path).astype(np.float32))
             # mask = (mask > 0.055)
             # mask_seg = mask
-
+            
+        
             mat_name = img_path.replace('images', 'ground_truth')[:-4] + ".mat"
             points = scio.loadmat(mat_name)['annPoints']
             points_sum = len(points)
@@ -435,7 +465,3 @@ class EvalDatasetConstructor(DatasetConstructor):
             
     def __len__(self):
         return self.validate_num
-
-
-
-
