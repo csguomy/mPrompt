@@ -10,7 +10,9 @@ import math
 import glob
 import os
 import cv2
+import scipy.io as scio
 from util import utils
+from gen_den_map import generate_density_map
 
 class DatasetConstructor(data.Dataset):
     def __init__(self):
@@ -189,6 +191,7 @@ class TrainDatasetConstructor(DatasetConstructor):
                 print('points_sum==0 ', img_path)
                           
             # Resize: annotation label vision
+            img_vision = img
             mask_annotation = np.zeros((img_vision.size[1], img_vision.size[0]), np.uint8)
             for i in range(0, points_sum):
                 mask_annotation = cv2.circle(mask_annotation, (math.ceil(points[i][0]), math.ceil(points[i][1])), 1, 1, -1) 
