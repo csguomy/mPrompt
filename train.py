@@ -137,15 +137,11 @@ with launch_ipdb_on_exception():
             else:
                 net_eval = net
 
-            validate_MAE, validate_RMSE, validate_loss, time_cost, pred_mae, pred_mse = estimator.evaluate(net_eval,  epoch_index, eval_loader.__len__() * batch_eval_size, opt.net_name) 
+            validate_MAE, validate_RMSE, validate_loss, time_cost, pred_mae, pred_mse = estimator.evaluate(net_eval,  epoch_index, eval_loader.__len__() * batch_eval_size) 
             
             if validate_MAE < best_mae:
                 best_mae = validate_MAE
                 best_mse = validate_RMSE
-            
-            # validate the code of eval
-            if opt.test_eval==1 and opt.start_eval_epoch==-1:
-                assert 1==2, print('Test over~')
             
             log_f.write(
                 'In step {}, epoch {}, loss = {}, eval_mae = {}, eval_rmse = {}, mae = {}, mse = {}, time cost eval = {}s, best_mae = {}_{}\n'.format(step, epoch_index, validate_loss, validate_MAE, validate_RMSE, pred_mae,
